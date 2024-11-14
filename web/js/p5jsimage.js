@@ -4,12 +4,13 @@ import { $el } from "/scripts/ui.js";
 
 const p5jsPreviewSrc = new URL(`../preview/index.html`, import.meta.url);
 
-async function saveSketch(filename, srcCode) {
+async function saveSketch(filename, srcCode, hasInputImage) {
   try {
     // Save sketch as before
     const blob = new Blob([srcCode], {type: 'text/plain'});
     const file = new File([blob], filename+'.js');
     const body = new FormData();
+    body.append("hasInputImage", hasInputImage);
     body.append("image", file);
     body.append("subfolder", "p5js");
     body.append("type", "temp");
@@ -87,8 +88,9 @@ app.registerExtension({
 
         //add run sketch
         const btn = node.addWidget("button", "Run Sketch", "run_p5js_sketch", () => {
-          saveSketch(widget.sketchfile, node.widgets[0].value).then((response) => {
-              widget.iframe.src = p5jsPreviewSrc + "?sketch=" + widget.sketchfile+'.js';
+          const hasInputImage = node.inputs && node.inputs.input_image !== undefined;
+          saveSketch(widget.sketchfile, node.widgets[0].value, hasInputImage).then((response) => {
+              widget.iframe.src = p5jsPreviewSrc + "?sketch=" + widget.sketchfile + '.js&hasInputImage=' + hasInputImage;
           });
         });
         btn.serializeValue = () => undefined;

@@ -5,12 +5,12 @@ import os
 import time
 import torch
 import torchvision.transforms as transforms
+from torchvision.utils import save_image
 from aiohttp import web
 from io import BytesIO
+import numpy as np
 from PIL import Image
 from server import PromptServer
-import os
-from aiohttp import web
 
 # handle proxy response
 @PromptServer.instance.routes.post('/HYPE/proxy_reply')
@@ -49,15 +49,40 @@ class HYPE_P5JSImage(nodes.LoadImage):
 
     FUNCTION = "run"
 
-    #OUTPUT_NODE = False
-
     CATEGORY = "p5js"
 
     def run(s, script, image, input_image=None):
         if input_image is not None:
-            # Save input_image as "image.png" in the node's directory
-            image_path = os.path.join(os.path.dirname(__file__), "image.png")
-            torchvision.utils.save_image(input_image, image_path)
+            image_path = os.path.join(os.path.dirname(__file__), "web", "input_image.png")
+            
+            # Convert the input_image to a numpy array
+            np_image = input_image.cpu().numpy()
+            
+            # Check if the image is a single pixel (1, 1, 3) with float values
+            if np_image.shape == (1, 1, 3) and np_image.dtype == np.float32:
+                # Expand the single pixel to a larger image
+                np_image = np.repeat(np_image, 512, axis=0)
+                np_image = np.repeat(np_image, 512, axis=1)
+            
+            # Ensure the image is in the correct format (H, W, C)
+            if len(np_image.shape) == 4:
+                np_image = np_image.squeeze(0)  # Remove batch dimension if present
+            
+            if len(np_image.shape) == 3 and np_image.shape[0] in [1, 3, 4]:
+                np_image = np_image.transpose(1, 2, 0)
+            
+            # Normalize the image to 0-255 range and convert to uint8
+            if np_image.dtype == np.float32:
+                np_image = (np_image * 255).clip(0, 255).astype(np.uint8)
+            
+            # If the image is grayscale, convert to RGB
+            if len(np_image.shape) == 2 or (len(np_image.shape) == 3 and np_image.shape[2] == 1):
+                np_image = np.stack((np_image,) * 3, axis=-1)
+            
+            # Create a PIL Image and save it
+            pil_image = Image.fromarray(np_image)
+            pil_image.save(image_path)
+        
         return super().load_image(folder_paths.get_annotated_filepath(image))
 
 # Message Handling
